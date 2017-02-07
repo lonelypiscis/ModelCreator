@@ -1,5 +1,6 @@
 package com.mrcrayfish.modelcreator.texture;
 
+import java.awt.Color;
 import java.awt.Component;
 
 import javax.swing.DefaultListCellRenderer;
@@ -15,10 +16,14 @@ public class TextureCellRenderer extends DefaultListCellRenderer
 	@Override
 	public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus)
 	{
-		lbl.setIcon(TextureManager.getIcon((String) list.getModel().getElementAt(index)));
+		int icon_scale = TextureManager.icon_scale_current;
+		String icon_name = (String) list.getModel().getElementAt(index);
+		lbl.setIcon(TextureManager.getIcon(icon_name, icon_scale));
+		lbl.setText(icon_name);
 		lbl.revalidate();
 		if (isSelected)
 		{
+			lbl.setBackground(Color.LIGHT_GRAY);
 			lbl.setOpaque(true);
 			lbl.setEnabled(false);
 		}

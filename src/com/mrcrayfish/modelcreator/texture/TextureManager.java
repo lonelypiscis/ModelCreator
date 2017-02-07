@@ -24,8 +24,11 @@ import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSlider;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import org.newdawn.slick.opengl.Texture;
@@ -36,6 +39,19 @@ import com.mrcrayfish.modelcreator.ModelCreator;
 import com.mrcrayfish.modelcreator.Settings;
 import com.mrcrayfish.modelcreator.element.ElementManager;
 import com.mrcrayfish.modelcreator.panels.SidebarPanel;
+import javax.swing.SpringLayout;
+import java.awt.Component;
+import javax.swing.Box;
+import javax.swing.SwingConstants;
+import javax.swing.JLabel;
+import javax.swing.BoxLayout;
+import java.awt.FlowLayout;
+import java.awt.GridBagLayout;
+import java.awt.GridBagConstraints;
+import java.awt.Insets;
+import com.jgoodies.forms.layout.FormLayout;
+import com.jgoodies.forms.layout.ColumnSpec;
+import com.jgoodies.forms.layout.RowSpec;
 
 public class TextureManager
 {
@@ -45,6 +61,10 @@ public class TextureManager
 	public static Texture dirt;
 
 	public static File lastLocation = null;
+	
+	public static int icon_scale_min = 16;
+	public static int icon_scale_max = 264;
+	public static int icon_scale_current = 128;
 
 	public static boolean loadExternalTexture(File image, File meta) throws IOException
 	{
@@ -171,9 +191,21 @@ public class TextureManager
 		}
 		return null;
 	}
+	
+	public static ImageIcon getIcon(String name, int scale) {
+		ImageIcon imageIcon = getIcon(name);
+		Image image = imageIcon.getImage();
+		Image newimg = image.getScaledInstance(scale, scale, java.awt.Image.SCALE_FAST);
+		imageIcon = new ImageIcon(newimg); 
+		
+		return imageIcon;
+	}
 
 	private static String texture = null;
 
+	/**
+	 * @wbp.parser.entryPoint
+	 */
 	public static String display(ElementManager manager)
 	{
 		Font defaultFont = new Font("SansSerif", Font.BOLD, 18);
@@ -185,114 +217,145 @@ public class TextureManager
 		list.setCellRenderer(new TextureCellRenderer());
 		list.setVisibleRowCount(-1);
 		list.setModel(model);
-		list.setFixedCellHeight(256);
-		list.setFixedCellWidth(256);
+		list.setFixedCellHeight(icon_scale_current);
+		list.setFixedCellWidth(icon_scale_current + icon_scale_max);
 		list.setBackground(new Color(221, 221, 228));
 		JScrollPane scroll = new JScrollPane(list);
 		scroll.getVerticalScrollBar().setVisible(false);
 		scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 
-		JPanel panel = new JPanel(new GridLayout(1, 3));
-		panel.setPreferredSize(new Dimension(1000, 40));
-		JButton btnSelect = new JButton("Apply");
-		btnSelect.addActionListener(a ->
-		{
-			if (list.getSelectedValue() != null)
-			{
-				texture = list.getSelectedValue();
-				SwingUtilities.getWindowAncestor(btnSelect).dispose();
-			}
-		});
-		btnSelect.setFont(defaultFont);
-		panel.add(btnSelect);
-
-		JButton btnImport = new JButton("Import");
-		btnImport.addActionListener(a ->
-		{
-			JFileChooser chooser = new JFileChooser();
-			chooser.setDialogTitle("Input File");
-			chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-			chooser.setApproveButtonText("Import");
-			
-			if (lastLocation == null) {
-				String dir = Settings.getImageImportDir();
-
-				if (dir != null)
-					lastLocation = new File(dir);
-			}
-			
-			if (lastLocation != null) {
-				chooser.setCurrentDirectory(lastLocation);
-			}
-			else
-			{
-				try
-				{
-					chooser.setCurrentDirectory(new File(ModelCreator.texturePath));
-				}
-				catch (Exception e1) {
-					e1.printStackTrace();
-				}
-			}
-
-
-			FileNameExtensionFilter filter = new FileNameExtensionFilter("PNG Images", "png");
-			chooser.setFileFilter(filter);
-			int returnVal = chooser.showOpenDialog(null);
-			if (returnVal == JFileChooser.APPROVE_OPTION)
-			{
-				lastLocation = chooser.getSelectedFile().getParentFile();
-				Settings.setImageImportDir(lastLocation.toString());
-				
-				try
-				{
-					File meta = new File(chooser.getSelectedFile().getAbsolutePath() + ".mcmeta");
-					manager.addPendingTexture(new PendingTexture(chooser.getSelectedFile(), meta, new TextureCallback()
-					{
-						@Override
-						public void callback(boolean success, String texture)
-						{
-							if (success)
-							{
-								model.insertElementAt(texture.replace(".png", ""), 0);
-							}
-							else
-							{
-								JOptionPane error = new JOptionPane();
-								error.setMessage("Width and height must be a multiple of 16.");
-								JDialog dialog = error.createDialog(btnImport, "Texture Error");
-								dialog.setLocationRelativeTo(null);
-								dialog.setModal(false);
-								dialog.setVisible(true);
-							}
-						}
-					}));
-				}
-				catch (Exception e1)
-				{
-					e1.printStackTrace();
-				}
-			}
-		});
-		btnImport.setFont(defaultFont);
-		panel.add(btnImport);
-
-		JButton btnClose = new JButton("Close");
-		btnClose.addActionListener(a ->
-		{
-			texture = null;
-			SwingUtilities.getWindowAncestor(btnClose).dispose();
-		});
-		btnClose.setFont(defaultFont);
-		panel.add(btnClose);
-
 		JDialog dialog = new JDialog(((SidebarPanel) manager).getCreator(), "Texture Manager", false);
-		dialog.setLayout(new BorderLayout());
+		dialog.getContentPane().setLayout(new BorderLayout());
 		dialog.setResizable(false);
 		dialog.setModalityType(Dialog.DEFAULT_MODALITY_TYPE);
 		dialog.setPreferredSize(new Dimension(540, 480));
-		dialog.add(scroll, BorderLayout.CENTER);
-		dialog.add(panel, BorderLayout.SOUTH);
+		dialog.getContentPane().add(scroll, BorderLayout.CENTER);
+		
+		JPanel pnlFooter = new JPanel();
+		dialog.getContentPane().add(pnlFooter, BorderLayout.SOUTH);
+		pnlFooter.setLayout(new BorderLayout(0, 0));
+		
+
+		JPanel pnlMainControlls = new JPanel();
+		pnlFooter.add(pnlMainControlls, BorderLayout.NORTH);
+		pnlMainControlls.setPreferredSize(new Dimension(1000, 40));
+				pnlMainControlls.setLayout(new BoxLayout(pnlMainControlls, BoxLayout.X_AXIS));
+				
+				JSlider sldImageScale = new JSlider(icon_scale_min, icon_scale_max, icon_scale_current);
+				pnlMainControlls.add(sldImageScale);
+				sldImageScale.addChangeListener(new ChangeListener() {
+					@Override
+					public void stateChanged(ChangeEvent e)
+					{
+						icon_scale_current = sldImageScale.getValue();
+						list.setFixedCellHeight(icon_scale_current);
+						list.setFixedCellWidth(icon_scale_current + icon_scale_max);
+						list.repaint();
+					}
+				});
+				sldImageScale.setPaintTicks(true);
+				sldImageScale.setMajorTickSpacing(16);
+				
+				Component horizontalStrut_1 = Box.createHorizontalStrut(100);
+				pnlMainControlls.add(horizontalStrut_1);
+				
+						JButton btnImport = new JButton("Import");
+						pnlMainControlls.add(btnImport);
+						btnImport.setHorizontalAlignment(SwingConstants.RIGHT);
+						btnImport.addActionListener(a ->
+						{
+							JFileChooser chooser = new JFileChooser();
+							chooser.setDialogTitle("Input File");
+							chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+							chooser.setApproveButtonText("Import");
+							
+							if (lastLocation == null) {
+								String dir = Settings.getImageImportDir();
+
+								if (dir != null)
+									lastLocation = new File(dir);
+							}
+							
+							if (lastLocation != null) {
+								chooser.setCurrentDirectory(lastLocation);
+							}
+							else
+							{
+								try
+								{
+									chooser.setCurrentDirectory(new File(ModelCreator.texturePath));
+								}
+								catch (Exception e1) {
+									e1.printStackTrace();
+								}
+							}
+
+
+							FileNameExtensionFilter filter = new FileNameExtensionFilter("PNG Images", "png");
+							chooser.setFileFilter(filter);
+							int returnVal = chooser.showOpenDialog(null);
+							if (returnVal == JFileChooser.APPROVE_OPTION)
+							{
+								lastLocation = chooser.getSelectedFile().getParentFile();
+								Settings.setImageImportDir(lastLocation.toString());
+								
+								try
+								{
+									File meta = new File(chooser.getSelectedFile().getAbsolutePath() + ".mcmeta");
+									manager.addPendingTexture(new PendingTexture(chooser.getSelectedFile(), meta, new TextureCallback()
+									{
+										@Override
+										public void callback(boolean success, String texture)
+										{
+											if (success)
+											{
+												model.insertElementAt(texture.replace(".png", ""), 0);
+											}
+											else
+											{
+												JOptionPane error = new JOptionPane();
+												error.setMessage("Width and height must be a multiple of 16.");
+												JDialog dialog = error.createDialog(btnImport, "Texture Error");
+												dialog.setLocationRelativeTo(null);
+												dialog.setModal(false);
+												dialog.setVisible(true);
+											}
+										}
+									}));
+								}
+								catch (Exception e1)
+								{
+									e1.printStackTrace();
+								}
+							}
+						});
+						btnImport.setFont(defaultFont);
+		
+				JButton btnClose = new JButton("Close");
+				pnlMainControlls.add(btnClose);
+				btnClose.setAlignmentX(Component.RIGHT_ALIGNMENT);
+				btnClose.addActionListener(a ->
+				{
+					texture = null;
+					SwingUtilities.getWindowAncestor(btnClose).dispose();
+				});
+				btnClose.setFont(defaultFont);
+				
+				JButton btnSelect = new JButton("Apply");
+				pnlMainControlls.add(btnSelect);
+				btnSelect.setAlignmentX(Component.RIGHT_ALIGNMENT);
+				btnSelect.addActionListener(a ->
+				{
+					if (list.getSelectedValue() != null)
+					{
+						texture = list.getSelectedValue();
+						SwingUtilities.getWindowAncestor(btnSelect).dispose();
+					}
+				});
+				btnSelect.setFont(defaultFont);
+				
+				Component horizontalStrut = Box.createHorizontalStrut(20);
+				pnlMainControlls.add(horizontalStrut);
 		dialog.pack();
 		dialog.setLocationRelativeTo(null);
 		dialog.setVisible(true);
