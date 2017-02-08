@@ -2,6 +2,8 @@ package com.mrcrayfish.modelcreator;
 
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.File;
 
@@ -13,6 +15,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
@@ -21,6 +24,7 @@ import com.mrcrayfish.modelcreator.screenshot.Screenshot;
 import com.mrcrayfish.modelcreator.screenshot.ScreenshotCallback;
 import com.mrcrayfish.modelcreator.screenshot.Uploader;
 import com.mrcrayfish.modelcreator.util.Util;
+import com.sun.corba.se.impl.oa.poa.ActiveObjectMap.Key;
 
 public class Menu extends JMenuBar
 {
@@ -31,10 +35,12 @@ public class Menu extends JMenuBar
 	/* File */
 	private JMenu menuFile;
 	private JMenuItem itemNew;
-	private JMenuItem itemLoad;
+	private JMenuItem itemOpen;
 	private JMenuItem itemSave;
+	private JMenuItem itemSaveAs;
 	private JMenuItem itemImport;
 	private JMenuItem itemExport;
+	private JMenuItem itemExportAs;
 	private JMenuItem itemTexturePath;
 	private JMenuItem itemExit;
 
@@ -71,12 +77,14 @@ public class Menu extends JMenuBar
 		menuFile = new JMenu("File");
 		{
 			itemNew = createItem("New", "New Model", KeyEvent.VK_N, Icons.new_);
-			itemLoad = createItem("Load Project...", "Load Project from File", KeyEvent.VK_S, Icons.load);
-			itemSave = createItem("Save Project...", "Save Project to File", KeyEvent.VK_S, Icons.disk);
-			itemImport = createItem("Import JSON...", "Import Model from JSON", KeyEvent.VK_I, Icons.import_);
-			itemExport = createItem("Export JSON...", "Export Model to JSON", KeyEvent.VK_E, Icons.export);
-			itemTexturePath = createItem("Set Texture Path...", "Set the base path to look for textures", KeyEvent.VK_S, Icons.texture);
-			itemExit = createItem("Exit", "Exit Application", KeyEvent.VK_E, Icons.exit);
+			itemOpen = createItem("Open Project...", "Open Project from File", KeyEvent.VK_O, Icons.load);
+			itemSave = createItem("Save", "Save Project to File", KeyEvent.VK_S, Icons.disk);
+			itemSaveAs = createItem("Save as...", "Save Project to new File", KeyEvent.VK_S, KeyEvent.SHIFT_MASK, Icons.disk);
+			itemImport = createItem("Import JSON", "Import Model from JSON", KeyEvent.VK_I, Icons.import_);
+			itemExport = createItem("Export JSON", "Export Model to JSON", KeyEvent.VK_E, Icons.export);
+			itemExportAs = createItem("Export JSON as...", "Export Model to new JSON File", KeyEvent.VK_E, KeyEvent.SHIFT_MASK, Icons.export);
+			itemTexturePath = createItem("Set Texture Path...", "Set the base path to look for textures", KeyEvent.VK_T, Icons.texture);
+			itemExit = createItem("Exit", "Exit Application", KeyEvent.VK_Q, Icons.exit);
 		}
 
 		menuOptions = new JMenu("Options");
@@ -130,11 +138,13 @@ public class Menu extends JMenuBar
 
 		menuFile.add(itemNew);
 		menuFile.addSeparator();
-		menuFile.add(itemLoad);
+		menuFile.add(itemOpen);
 		menuFile.add(itemSave);
+		menuFile.add(itemSaveAs);
 		menuFile.addSeparator();
 		menuFile.add(itemImport);
 		menuFile.add(itemExport);
+		menuFile.add(itemExportAs);
 		menuFile.addSeparator();
 		menuFile.add(itemTexturePath);
 		menuFile.addSeparator();
@@ -158,7 +168,7 @@ public class Menu extends JMenuBar
 			}
 		});
 
-		itemLoad.addActionListener(a ->
+		itemOpen.addActionListener(a ->
 		{
 			JFileChooser chooser = new JFileChooser();
 			chooser.setDialogTitle("Output Directory");
@@ -186,46 +196,26 @@ public class Menu extends JMenuBar
 				{
 					File location = chooser.getSelectedFile().getParentFile();
 					Settings.setModelDir(location.toString());
+					Settings.setModelName(chooser.getSelectedFile().getName());
 
 					ProjectManager.loadProject(creator.getElementManager(), chooser.getSelectedFile().getAbsolutePath());
 				}
 			}
 		});
+		
+		itemSave.addActionListener(a -> {
+			String modelName = Settings.getModelName();
+			
+			if (modelName == null) {
+				runSaveDialog();
+			} else {
+				save(new File(Settings.getModelDir() + "/" + Settings.getModelName()));
+			}
+		});
 
-		itemSave.addActionListener(a ->
+		itemSaveAs.addActionListener(a ->
 		{
-			JFileChooser chooser = new JFileChooser();
-			chooser.setDialogTitle("Output Directory");
-			chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-			chooser.setApproveButtonText("Save");
-
-			FileNameExtensionFilter filter = new FileNameExtensionFilter("Model (.model)", "model");
-			chooser.setFileFilter(filter);
-			String dir = Settings.getModelDir();
-
-			if (dir != null)
-			{
-				chooser.setCurrentDirectory(new File(dir));
-			}
-
-			int returnVal = chooser.showSaveDialog(null);
-			if (returnVal == JFileChooser.APPROVE_OPTION)
-			{
-				if (chooser.getSelectedFile().exists())
-				{
-					returnVal = JOptionPane.showConfirmDialog(null, "A file already exists with that name, are you sure you want to override?", "Warning", JOptionPane.YES_NO_OPTION);
-				}
-				if (returnVal != JOptionPane.NO_OPTION && returnVal != JOptionPane.CLOSED_OPTION)
-				{
-					File location = chooser.getSelectedFile().getParentFile();
-					Settings.setModelDir(location.toString());
-
-					String filePath = chooser.getSelectedFile().getAbsolutePath();
-					if (!filePath.endsWith(".model"))
-						filePath += ".model";
-					ProjectManager.saveProject(creator.getElementManager(), filePath);
-				}
-			}
+			runSaveDialog();
 		});
 
 		itemImport.addActionListener(e ->
@@ -256,50 +246,34 @@ public class Menu extends JMenuBar
 				{
 					File location = chooser.getSelectedFile().getParentFile();
 					Settings.setJSONDir(location.toString());
-
+					Settings.setJSONName(chooser.getSelectedFile().getName());
+					
 					Importer importer = new Importer(creator.getElementManager(), chooser.getSelectedFile().getAbsolutePath());
 					importer.importFromJSON();
+					
 				}
 				creator.getElementManager().updateValues();
 			}
 		});
-
-		itemExport.addActionListener(e ->
+		
+		itemExport.addActionListener(new ActionListener()
 		{
-			JFileChooser chooser = new JFileChooser();
-			chooser.setDialogTitle("Output Directory");
-			chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-			chooser.setApproveButtonText("Export");
-
-			FileNameExtensionFilter filter = new FileNameExtensionFilter("JSON (.json)", "json");
-			chooser.setFileFilter(filter);
-
-			String dir = Settings.getJSONDir();
-
-			if (dir != null)
+			@Override
+			public void actionPerformed(ActionEvent e)
 			{
-				chooser.setCurrentDirectory(new File(dir));
-			}
-
-			int returnVal = chooser.showSaveDialog(null);
-			if (returnVal == JFileChooser.APPROVE_OPTION)
-			{
-				if (chooser.getSelectedFile().exists())
-				{
-					returnVal = JOptionPane.showConfirmDialog(null, "A file already exists with that name, are you sure you want to override?", "Warning", JOptionPane.YES_NO_OPTION);
-				}
-				if (returnVal != JOptionPane.NO_OPTION && returnVal != JOptionPane.CLOSED_OPTION)
-				{
-					File location = chooser.getSelectedFile().getParentFile();
-					Settings.setJSONDir(location.toString());
-
-					String filePath = chooser.getSelectedFile().getAbsolutePath();
-					if (!filePath.endsWith(".json"))
-						chooser.setSelectedFile(new File(filePath + ".json"));
-					Exporter exporter = new Exporter(creator.getElementManager());
-					exporter.export(chooser.getSelectedFile());
+				String jsonName = Settings.getJSONName();
+				
+				if (jsonName == null) {
+					runExportDialog();
+				} else {
+					exportAsJSON(new File(Settings.getJSONDir() + "/" + Settings.getJSONName()));
 				}
 			}
+		});
+
+		itemExportAs.addActionListener(e ->
+		{
+			runExportDialog();
 		});
 
 		itemTexturePath.addActionListener(e ->
@@ -514,12 +488,127 @@ public class Menu extends JMenuBar
 			Util.loadModelFromJar(creator.getElementManager(), getClass(), "models/modern_chair");
 		});
 	}
+	
+	private void runSaveDialog() {
+		JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle("Output Directory");
+		chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+		chooser.setApproveButtonText("Save");
+
+		FileNameExtensionFilter filter = new FileNameExtensionFilter("Model (.model)", "model");
+		chooser.setFileFilter(filter);
+		String dir = Settings.getModelDir();
+
+		if (dir != null)
+		{
+			chooser.setCurrentDirectory(new File(dir));
+		}
+
+		int returnVal = chooser.showSaveDialog(null);
+		if (returnVal == JFileChooser.APPROVE_OPTION)
+		{
+			if (chooser.getSelectedFile().exists())
+			{
+				returnVal = JOptionPane.showConfirmDialog(null, "A file already exists with that name, are you sure you want to override?", "Warning", JOptionPane.YES_NO_OPTION);
+			}
+			if (returnVal != JOptionPane.NO_OPTION && returnVal != JOptionPane.CLOSED_OPTION)
+			{
+				save(chooser.getSelectedFile());
+			}
+		}
+	}
+	
+	private void save(File file) {
+		Settings.setModelDir(file.getParentFile().toString());
+		
+		String filePath = file.getAbsolutePath();
+		if (!filePath.endsWith(".model"))
+			filePath += ".model";
+		ProjectManager.saveProject(creator.getElementManager(), filePath);
+	}
+	
+	private void runExportDialog() {
+		JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle("Output Directory");
+		chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+		chooser.setApproveButtonText("Export");
+
+		FileNameExtensionFilter filter = new FileNameExtensionFilter("JSON (.json)", "json");
+		chooser.setFileFilter(filter);
+
+		String dir = Settings.getJSONDir();
+
+		if (dir != null)
+		{
+			chooser.setCurrentDirectory(new File(dir));
+		}
+
+		int returnVal = chooser.showSaveDialog(null);
+		if (returnVal == JFileChooser.APPROVE_OPTION)
+		{
+			if (chooser.getSelectedFile().exists())
+			{
+				returnVal = JOptionPane.showConfirmDialog(null, "A file already exists with that name, are you sure you want to override?", "Warning", JOptionPane.YES_NO_OPTION);
+			}
+			if (returnVal != JOptionPane.NO_OPTION && returnVal != JOptionPane.CLOSED_OPTION)
+			{
+				File location = chooser.getSelectedFile().getParentFile();
+				Settings.setJSONDir(location.toString());
+				Settings.setJSONName(chooser.getSelectedFile().getName());
+
+				String filePath = chooser.getSelectedFile().getAbsolutePath();
+				if (!filePath.endsWith(".json"))
+					chooser.setSelectedFile(new File(filePath + ".json"));
+				exportAsJSON(chooser.getSelectedFile());
+			}
+		}
+	}
+	
+	private void exportAsJSON(File location) {
+		System.out.println("Exporting... to " + location.getAbsolutePath());
+		
+		Exporter exporter = new Exporter(creator.getElementManager());
+		exporter.export(location);
+	}
+	
+	/* 
+	 * Adds menu items based on the system's operating system. Windows uses ctrl-key, Mac uses cmd-key instead.
+	 */
+	
+	private int getSystemControlKey() {
+		if (System.getProperty("os.name").contains("Mac")) {
+			return Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+		} else if (System.getProperty("os.name").contains("Windows")) {
+			return KeyEvent.CTRL_MASK;
+		}
+		
+		return KeyEvent.CTRL_MASK;
+	}
+	
+	/* Adds an accelerator key identical to the mnemonic.
+	 * Uses the default system control key.
+	 */
 
 	private JMenuItem createItem(String name, String tooltip, int mnemonic, Icon icon)
 	{
 		JMenuItem item = new JMenuItem(name);
 		item.setToolTipText(tooltip);
 		item.setMnemonic(mnemonic);
+		item.setAccelerator(KeyStroke.getKeyStroke(mnemonic, getSystemControlKey()));
+		item.setIcon(icon);
+		return item;
+	}
+	
+	/* Adds an accelerator key identical to the mnemonic.
+	 * Uses the specified control key in addition to the system's default.
+	 */
+	
+	private JMenuItem createItem(String name, String tooltip, int mnemonic, int controlKey, Icon icon)
+	{
+		JMenuItem item = new JMenuItem(name);
+		item.setToolTipText(tooltip);
+		item.setMnemonic(mnemonic);
+		item.setAccelerator(KeyStroke.getKeyStroke(mnemonic, getSystemControlKey()+controlKey));
 		item.setIcon(icon);
 		return item;
 	}
@@ -533,4 +622,5 @@ public class Menu extends JMenuBar
 
 		return item;
 	}
+	
 }
