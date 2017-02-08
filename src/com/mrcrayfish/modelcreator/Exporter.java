@@ -9,6 +9,8 @@ import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.lwjgl.Sys;
+
 import com.mrcrayfish.modelcreator.element.Element;
 import com.mrcrayfish.modelcreator.element.ElementManager;
 import com.mrcrayfish.modelcreator.element.Face;
@@ -191,17 +193,18 @@ public class Exporter
 		writer.newLine();
 		for (Face face : cuboid.getAllFaces())
 		{
-			if (face.isEnabled() && textureList.indexOf(face.getTextureLocation() + face.getTextureName()) != -1)
+			if (face.isEnabled())
 			{
 				writer.write(space(4) + "\"" + Face.getFaceName(face.getSide()) + "\": { ");
 				writer.write("\"texture\": \"#" + textureList.indexOf(face.getTextureLocation() + face.getTextureName()) + "\"");
+				writer.write(", \"uv\": [ " + face.getStartU() + ", " + face.getStartV() + ", " + face.getEndU() + ", " + face.getEndV() + " ]");
 				writer.write(", \"uv\": [ " + df.format(face.getStartU()) + ", " + df.format(face.getStartV()) + ", " + df.format(face.getEndU()) + ", " + df.format(face.getEndV()) + " ]");
 				if (face.getRotation() > 0)
 					writer.write(", \"rotation\": " + (int) face.getRotation() * 90);
 				if (face.isCullfaced())
 					writer.write(", \"cullface\": \"" + Face.getFaceName(face.getSide()) + "\"");
 				writer.write(" }");
-				if (face.getSide() != cuboid.getLastValidFace())
+				if (face.getSide() != 5)
 				{
 					writer.write(",");
 					writer.newLine();
